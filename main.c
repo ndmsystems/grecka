@@ -52,8 +52,6 @@ THE SOFTWARE.
 #include <ndm/sys.h>
 #include <ndm/feedback.h>
 
-#define NDM_FEEDBACK_FILE			"/var/run/grecka.fb"
-
 #define POLL_TIME					950 // 1 sec
 #define READ_RETRY_MS				100 // ms
 #define READ_RETRY_TIMES			5 //
@@ -86,6 +84,7 @@ static bool debug = false;
 static unsigned long interval = 5;
 static unsigned long count = 3;
 static const char *interface_id = "";
+static const char *feedback = "";
 static struct ndm_ip_sockaddr_t local_address;
 static struct ndm_ip_sockaddr_t remote_address;
 
@@ -579,7 +578,7 @@ static void grecka_event_loop()
 
 				if (ndm_time_greater_or_equal(&ts_now, &ts_rcv)) {
 					const char *args[] = {
-						NDM_FEEDBACK_FILE,
+						feedback,
 						interface_id,
 						"timeout",
 						NULL
@@ -765,7 +764,7 @@ int main(int argc, char *argv[])
 	remote_address = NDM_IP_SOCKADDR_ANY;
 
 	for (;;) {
-		c = getopt(argc, argv, "i:c:raI:L:R:d");
+		c = getopt(argc, argv, "i:c:raI:L:R:dF:");
 
 		if (c < 0)
 			break;
@@ -804,6 +803,10 @@ int main(int argc, char *argv[])
 			interface_id = optarg;
 			break;
 
+		case 'F':
+			feedback = optarg;
+			break;
+
 		case 'L':
 			if (!ndm_ip_sockaddr_pton(optarg, &local_address)) {
 				NDM_LOG_ERROR("invalid local source value: \"%s\"",
@@ -840,6 +843,14 @@ int main(int argc, char *argv[])
 	}
 
 	NDM_LOG_INFO("%s: GRE keepalive daemon started", interface_id);
+
+	if (send_probes) {
+		NDM_LOG_INFO("%s: send active requests enabled", interface_id);
+	}
+
+	if (handle_requests) {
+		NDM_LOG_INFO("%s: replies to external requests enabled", interface_id);
+	}
 
 	grecka_main();
 
