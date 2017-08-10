@@ -24,7 +24,7 @@ CFLAGS   ?= \
 	-Wmissing-field-initializers -Wconversion \
 	-Wredundant-decls -Wstack-protector -ftabstop=4 -Wshadow \
 	-Wpointer-arith -I$(PWD)/include/
-LDFLAGS  += -lc
+LDFLAGS  += -lc -lndm
 
 ifeq ($(UNAME),Linux)
 CFLAGS   += -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=600 -D_SVID_SOURCE=1
@@ -39,4 +39,3 @@ clean:
 	rm -fv *.o *~ $(GRECKA)
 
 distclean: clean
-
