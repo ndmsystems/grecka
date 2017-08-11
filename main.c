@@ -213,6 +213,18 @@ static struct sock_filter gre_ka_request_filter_code[] = {
 	{ 0x06,  0,  0, 0000000000 },
 };
 
+
+/*
+ * gre_ka_empty_filter as disassembled
+ */
+/*
+ret #0
+*/
+
+static struct sock_filter gre_ka_empty_filter[] = {
+	{ 0x06,  0,  0, 0000000000 },
+};
+
 static bool grecka_attach_bpf(int fd, struct sock_fprog *bpf)
 {
 	if (!bpf) {
@@ -667,6 +679,18 @@ static void grecka_main(void)
 		goto cleanup;
 	}
 
+	/* Drop everything that income, socket only for sending */
+	{
+		struct sock_fprog bpf = {
+			.len = ARRAYSIZE(gre_ka_empty_filter),
+			.filter = gre_ka_empty_filter,
+		};
+
+		if (!grecka_attach_bpf(fd_send, &bpf)) {
+			goto cleanup;
+		}
+	}
+
 	if (handle_requests) {
 		fd_request = socket(PF_INET, SOCK_RAW, IPPROTO_GRE);
 
@@ -690,7 +714,7 @@ static void grecka_main(void)
 				.filter = gre_ka_request_filter_code,
 			};
 
-			if ( !grecka_attach_bpf(fd_request, &bpf)) {
+			if (!grecka_attach_bpf(fd_request, &bpf)) {
 				goto cleanup;
 			}
 		}
