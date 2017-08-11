@@ -51,12 +51,11 @@ THE SOFTWARE.
 #include <ndm/time.h>
 #include <ndm/sys.h>
 #include <ndm/feedback.h>
+#include <ndm/attr.h>
 
 #define POLL_TIME					950 // 1 sec
 #define READ_RETRY_MS				100 // ms
 #define READ_RETRY_TIMES			5 //
-
-#define ARRAYSIZE(arr)				(sizeof(arr) / sizeof(arr[0]))
 
 #define GRE_KA_FLAGS				0
 #define GRE_KA_VERSION				0
@@ -67,7 +66,7 @@ struct gre_hdr
 	uint8_t flags;
 	uint8_t version;
 	uint16_t protocol;
-} __attribute__((__packed__));
+} NDM_ATTR_PACKED;
 
 struct keepalive_packet
 {
@@ -75,7 +74,7 @@ struct keepalive_packet
 	struct gre_hdr outer_gre_hdr;
 	struct iphdr inner_ip_hdr;
 	struct gre_hdr inner_gre_hdr;
-} __attribute__((__packed__));
+} NDM_ATTR_PACKED;
 
 /* external configuration */
 static bool handle_requests = false;
@@ -89,7 +88,6 @@ static struct ndm_ip_sockaddr_t local_address;
 static struct ndm_ip_sockaddr_t remote_address;
 
 /* internal state */
-
 static int fd_request = -1;
 static int fd_reply = -1;
 static int fd_send = -1;
@@ -213,10 +211,10 @@ static struct sock_filter gre_ka_request_filter_code[] = {
 	{ 0x06,  0,  0, 0000000000 },
 };
 
-
 /*
  * gre_ka_empty_filter as disassembled
  */
+
 /*
 ret #0
 */
@@ -258,7 +256,8 @@ static bool grecka_set_nonblock(int fd)
 			strerror(err));
 
 		return false;
-	} else
+	}
+
 	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
 		const int err = errno;
 
@@ -275,41 +274,26 @@ static bool grecka_set_nonblock(int fd)
 static bool grecka_nonblock_read(
 		int fd, void *p, size_t buf_size, size_t *bytes_read)
 {
-	size_t bread = 0;
-	unsigned long retries = 0;
+	const ssize_t n = recv(fd, p, buf_size, 0);
 
 	*bytes_read = 0;
 
-	while (!ndm_sys_is_interrupted() && bread == 0) {
-		const ssize_t n = recv(fd, p, buf_size, 0);
+	if (n < 0) {
+		const int error = errno;
 
-		if (n < 0) {
-			const int error = errno;
+		if (error == EINTR || error == EAGAIN || error == EWOULDBLOCK) {
+			return false;
 
-			if (error == EINTR || error == EAGAIN || error == EWOULDBLOCK) {
-				if (++retries <= READ_RETRY_TIMES) {
-					struct timespec ts;
-
-					ts.tv_sec = 0;
-					ts.tv_nsec = READ_RETRY_MS * 1000;
-
-					nanosleep(&ts, NULL);
-				} else {
-					return false;
-				}
-			} else {
-				NDM_LOG_ERROR("%s: unable receive packet: %s",
-					interface_id,
-					strerror(error));
-
-				return false;
-			}
 		} else {
-			bread = (size_t)n;
-		}
-	}
+			NDM_LOG_ERROR("%s: unable receive packet: %s",
+				interface_id,
+				strerror(error));
 
-	*bytes_read = bread;
+			return false;
+		}
+	} else {
+		*bytes_read = (size_t)n;
+	}
 
 	return true;
 }
@@ -378,6 +362,11 @@ static void grecka_handle_ka_reply()
 
 	if (!grecka_nonblock_read(fd_reply, &p, sizeof(p), &bytes_read) ||
 			bytes_read != (sizeof(struct iphdr) + sizeof(struct gre_hdr))) {
+
+		if (bytes_read == 0) {
+			return;
+		}
+
 		NDM_LOG_ERROR("%s: (>) unable to receive keepalive reply: %d",
 			interface_id,
 			bytes_read);
@@ -418,6 +407,11 @@ static void grecka_handle_ka_request()
 
 	if (!grecka_nonblock_read(fd_request, &p, sizeof(p), &bytes_read) ||
 			bytes_read != (sizeof(p))) {
+
+		if (bytes_read == 0) {
+			return;
+		}
+
 		NDM_LOG_ERROR("%s: (<) unable to receive keepalive request: %d",
 			interface_id,
 			bytes_read);
@@ -550,7 +544,7 @@ static void grecka_send_keepalive()
 static void grecka_event_loop()
 {
 	while (!ndm_sys_is_interrupted()) {
-		int ret = poll(pfds, 2, POLL_TIME);
+		int ret = poll(pfds, NDM_ARRAY_SIZE(pfds), POLL_TIME);
 		bool has_error = false;
 
 		if (ndm_sys_is_interrupted())
@@ -572,45 +566,45 @@ static void grecka_event_loop()
 			goto reinit;
 		}
 
-		if (ret == 0) {
-			if (send_probes && !is_down) {
-				struct timespec ts = last_send;
-				struct timespec ts_rcv = last_recv;
-				struct timespec ts_now;
+		if (send_probes && !is_down) {
+			struct timespec ts = last_send;
+			struct timespec ts_rcv = last_recv;
+			struct timespec ts_now;
 
-				ndm_time_get_monotonic(&ts_now);
-				ndm_time_add_sec(&ts, interval);
+			ndm_time_get_monotonic(&ts_now);
+			ndm_time_add_sec(&ts, interval);
 
-				if (ndm_time_greater_or_equal(&ts_now, &ts)) {
-					grecka_send_keepalive();
-					last_send = ts_now;
-				}
-
-				ndm_time_add_sec(&ts_rcv, interval * count);
-
-				if (ndm_time_greater_or_equal(&ts_now, &ts_rcv)) {
-					const char *args[] = {
-						feedback,
-						interface_id,
-						"timeout",
-						NULL
-					};
-
-					if (!ndm_feedback(
-							NDM_FEEDBACK_TIMEOUT_MSEC,
-							args,
-							"SRC=greka")) {
-						NDM_LOG_ERROR("%s: unable to send feedback", interface_id);
-					} else {
-						is_down = true;
-					}
-				}
+			if (ndm_time_greater_or_equal(&ts_now, &ts)) {
+				grecka_send_keepalive();
+				last_send = ts_now;
 			}
 
+			ndm_time_add_sec(&ts_rcv, interval * count);
+
+			if (ndm_time_greater_or_equal(&ts_now, &ts_rcv)) {
+				const char *args[] = {
+					feedback,
+					interface_id,
+					"timeout",
+					NULL
+				};
+
+				if (!ndm_feedback(
+						NDM_FEEDBACK_TIMEOUT_MSEC,
+						args,
+						"SRC=greka")) {
+					NDM_LOG_ERROR("%s: unable to send feedback", interface_id);
+				} else {
+					is_down = true;
+				}
+			}
+		}
+
+		if (ret == 0) {
 			continue;
 		}
 
-		for (unsigned long i = 0; i < 2; ++i) {
+		for (unsigned long i = 0; i < NDM_ARRAY_SIZE(pfds); ++i) {
 			if ((pfds[i].revents & POLLERR) || (pfds[i].revents & POLLHUP)) {
 				has_error = true;
 			}
@@ -627,7 +621,7 @@ static void grecka_event_loop()
 			return;
 		}
 
-		for (unsigned long i = 0; i < 2; ++i) {
+		for (unsigned long i = 0; i < NDM_ARRAY_SIZE(pfds); ++i) {
 			if ((pfds[i].revents & POLLIN) && pfds[i].fd == fd_request) {
 				grecka_handle_ka_request();
 			}
@@ -638,12 +632,12 @@ static void grecka_event_loop()
 		}
 
 reinit:
-		memset(&pfds, 0, sizeof(struct pollfd) * 2);
-
 		pfds[0].fd = fd_request;
 		pfds[0].events = POLLIN;
+		pfds[0].revents = 0;
 		pfds[1].fd = fd_reply;
 		pfds[1].events = POLLIN;
+		pfds[1].revents = 0;
 	}
 }
 
@@ -682,7 +676,7 @@ static void grecka_main(void)
 	/* Drop everything that income, socket only for sending */
 	{
 		struct sock_fprog bpf = {
-			.len = ARRAYSIZE(gre_ka_empty_filter),
+			.len = NDM_ARRAY_SIZE(gre_ka_empty_filter),
 			.filter = gre_ka_empty_filter,
 		};
 
@@ -710,7 +704,7 @@ static void grecka_main(void)
 
 		{
 			struct sock_fprog bpf = {
-				.len = ARRAYSIZE(gre_ka_request_filter_code),
+				.len = NDM_ARRAY_SIZE(gre_ka_request_filter_code),
 				.filter = gre_ka_request_filter_code,
 			};
 
@@ -739,7 +733,7 @@ static void grecka_main(void)
 
 		{
 			struct sock_fprog bpf = {
-				.len = ARRAYSIZE(gre_ka_reply_filter_code),
+				.len = NDM_ARRAY_SIZE(gre_ka_reply_filter_code),
 				.filter = gre_ka_reply_filter_code,
 			};
 
@@ -752,7 +746,7 @@ static void grecka_main(void)
 	ndm_time_get_monotonic(&last_send);
 	ndm_time_get_monotonic(&last_recv);
 
-	memset(&pfds, 0, sizeof(struct pollfd) * 2);
+	memset(&pfds, 0, sizeof(pfds));
 
 	pfds[0].fd = fd_request;
 	pfds[0].events = POLLIN;
