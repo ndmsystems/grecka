@@ -226,7 +226,7 @@ static struct sock_filter gre_ka_empty_filter[] = {
 static bool grecka_attach_bpf(int fd, struct sock_fprog *bpf)
 {
 	if (!bpf) {
-		NDM_LOG_CRITICAL("%s: null value as filter", interface_id);
+		NDM_LOG_CRITICAL("null value as filter");
 
 		return false;
 	}
@@ -234,9 +234,7 @@ static bool grecka_attach_bpf(int fd, struct sock_fprog *bpf)
 	if (setsockopt(fd, SOL_SOCKET, SO_ATTACH_FILTER, bpf, sizeof(*bpf)) < 0) {
 		const int err = errno;
 
-		NDM_LOG_ERROR("%s: unable to attach BPF socket filter: %s",
-			interface_id,
-			strerror(err));
+		NDM_LOG_ERROR("unable to attach BPF socket filter: %s", strerror(err));
 
 		return false;
 	}
@@ -251,9 +249,7 @@ static bool grecka_set_nonblock(int fd)
 	if ((flags = fcntl(fd, F_GETFL)) == -1) {
 		const int err = errno;
 
-		NDM_LOG_ERROR("%s: unable to get socket options: %s",
-			interface_id,
-			strerror(err));
+		NDM_LOG_ERROR("unable to get socket flags: %s", strerror(err));
 
 		return false;
 	}
@@ -261,9 +257,7 @@ static bool grecka_set_nonblock(int fd)
 	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
 		const int err = errno;
 
-		NDM_LOG_ERROR("%s: unable to get socket options: %s",
-			interface_id,
-			strerror(err));
+		NDM_LOG_ERROR("unable to set socket flags: %s", strerror(err));
 
 		return false;
 	}
@@ -285,9 +279,7 @@ static bool grecka_nonblock_read(
 			return false;
 
 		} else {
-			NDM_LOG_ERROR("%s: unable receive packet: %s",
-				interface_id,
-				strerror(error));
+			NDM_LOG_ERROR("unable receive packet: %s", strerror(error));
 
 			return false;
 		}
@@ -332,9 +324,7 @@ static bool grecka_nonblock_write(
 					return false;
 				}
 			} else {
-				NDM_LOG_ERROR("%s: unable send packet: %s",
-					interface_id,
-					strerror(error));
+				NDM_LOG_ERROR("unable send packet: %s", strerror(error));
 
 				return false;
 			}
@@ -354,8 +344,7 @@ static void grecka_handle_ka_reply()
 	size_t bytes_read = 0;
 
 	if (fd_reply == -1) {
-		NDM_LOG_ERROR("%s: reply receiving socket is invalid",
-			interface_id);
+		NDM_LOG_ERROR("reply receiving socket is invalid");
 
 		return;
 	}
@@ -367,9 +356,7 @@ static void grecka_handle_ka_reply()
 			return;
 		}
 
-		NDM_LOG_ERROR("%s: (>) unable to receive keepalive reply: %d",
-			interface_id,
-			bytes_read);
+		NDM_LOG_ERROR("(>) unable to receive keepalive reply: %d", bytes_read);
 
 		return;
 	}
@@ -386,8 +373,7 @@ static void grecka_handle_ka_reply()
 		if (debug) {
 			char buf[NDM_IP_SOCKADDR_LEN];
 
-			NDM_LOG_INFO("%s: (>) recieve GRE keepalive reply packet from %s",
-				interface_id,
+			NDM_LOG_INFO("(>) receive GRE keepalive reply packet from %s",
 				ndm_ip_sockaddr_ntop(&remote_address, buf, NDM_IP_SOCKADDR_LEN));
 		}
 	}
@@ -399,8 +385,7 @@ static void grecka_handle_ka_request()
 	size_t bytes_read = 0;
 
 	if (fd_request == -1) {
-		NDM_LOG_ERROR("%s: request receiving socket is invalid",
-			interface_id);
+		NDM_LOG_ERROR("request receiving socket is invalid");
 
 		return;
 	}
@@ -412,8 +397,7 @@ static void grecka_handle_ka_request()
 			return;
 		}
 
-		NDM_LOG_ERROR("%s: (<) unable to receive keepalive request: %d",
-			interface_id,
+		NDM_LOG_ERROR("(<) unable to receive keepalive request: %d",
 			bytes_read);
 
 		return;
@@ -438,14 +422,12 @@ static void grecka_handle_ka_request()
 		if (debug) {
 			char buf[NDM_IP_SOCKADDR_LEN];
 
-			NDM_LOG_INFO("%s: (<) recieve GRE keepalive request packet from %s",
-				interface_id,
+			NDM_LOG_INFO("(<) receive GRE keepalive request packet from %s",
 				ndm_ip_sockaddr_ntop(&remote_address, buf, NDM_IP_SOCKADDR_LEN));
 		}
 
 		if (fd_send == -1) {
-			NDM_LOG_ERROR("%s: sending socket is invalid",
-				interface_id);
+			NDM_LOG_ERROR("sending socket is invalid");
 
 			return;
 		}
@@ -454,22 +436,19 @@ static void grecka_handle_ka_request()
 					&(p.inner_ip_hdr), reply_len,
 					&bytes_written, &remote_address) ||
 				bytes_written != reply_len) {
-			NDM_LOG_ERROR("%s: unable to send reply to GRE keepalive request packet: %u",
-				interface_id,
+			NDM_LOG_ERROR("unable to send reply to GRE keepalive request packet: %u",
 				bytes_written);
 		} else
 		if (debug) {
 			char buf[NDM_IP_SOCKADDR_LEN];
 
-			NDM_LOG_INFO("%s: (<) sent GRE keepalive request response to %s",
-				interface_id,
+			NDM_LOG_INFO("(<) sent GRE keepalive request response to %s",
 				ndm_ip_sockaddr_ntop(&remote_address, buf, NDM_IP_SOCKADDR_LEN));
 		}
 	} else {
 		char buf[NDM_IP_SOCKADDR_LEN];
 
-		NDM_LOG_ERROR("%s: (<) recieve invalid GRE keepalive request packet from %s",
-			interface_id,
+		NDM_LOG_ERROR("(<) receive invalid GRE keepalive request packet from %s",
 			ndm_ip_sockaddr_ntop(&remote_address, buf, NDM_IP_SOCKADDR_LEN));
 	}
 }
@@ -480,8 +459,7 @@ static void grecka_send_keepalive()
 	size_t bytes_written = 0;
 
 	if (fd_send == -1) {
-		NDM_LOG_ERROR("%s: sending socket is invalid",
-			interface_id);
+		NDM_LOG_ERROR("sending socket is invalid");
 
 		return;
 	}
@@ -520,24 +498,20 @@ static void grecka_send_keepalive()
 	if (!grecka_nonblock_write(fd_send, &p, sizeof(p),
 				&bytes_written, &remote_address) ||
 			bytes_written != sizeof(p)) {
-		NDM_LOG_ERROR("%s: (>) unable to send GRE keepalive packet: %u",
-			interface_id,
+		NDM_LOG_ERROR("(>) unable to send GRE keepalive packet: %u",
 			bytes_written);
 	} else
 	if (debug) {
 		char buf[NDM_IP_SOCKADDR_LEN];
 		struct timespec ts;
 
-		NDM_LOG_INFO("%s: (>) sent GRE keepalive request to %s",
-			interface_id,
+		NDM_LOG_INFO("(>) sent GRE keepalive request to %s",
 			ndm_ip_sockaddr_ntop(&remote_address, buf, NDM_IP_SOCKADDR_LEN));
 
 		ndm_time_get_monotonic(&ts);
 		ndm_time_sub(&ts, &last_recv);
 
-		NDM_LOG_INFO("%s: (>) last GRE keepalive reply was %ld s ago",
-			interface_id,
-			ts.tv_sec);
+		NDM_LOG_INFO("(>) last GRE keepalive reply was %ld s ago", ts.tv_sec);
 	}
 }
 
@@ -557,9 +531,7 @@ static void grecka_event_loop()
 				return;
 			}
 
-			NDM_LOG_ERROR("%s: poll error: %s",
-				interface_id,
-				strerror(err));
+			NDM_LOG_ERROR("poll error: %s", strerror(err));
 
 			ndm_sys_sleep_msec(NDM_SYS_SLEEP_GRANULARITY_MSEC);
 
@@ -593,7 +565,7 @@ static void grecka_event_loop()
 						NDM_FEEDBACK_TIMEOUT_MSEC,
 						args,
 						"SRC=greka")) {
-					NDM_LOG_ERROR("%s: unable to send feedback", interface_id);
+					NDM_LOG_ERROR("unable to send feedback");
 				} else {
 					is_down = true;
 				}
@@ -615,8 +587,7 @@ static void grecka_event_loop()
 		}
 
 		if (has_error) {
-			NDM_LOG_ERROR("%s: socket was unexpectedly closed",
-				interface_id);
+			NDM_LOG_ERROR("socket was unexpectedly closed");
 
 			return;
 		}
@@ -650,9 +621,7 @@ static void grecka_main(void)
 	if (fd_send == -1) {
 		const int err = errno;
 
-		NDM_LOG_ERROR("%s: unable to open send socket: %s",
-			interface_id,
-			strerror(err));
+		NDM_LOG_ERROR("unable to open send socket: %s", strerror(err));
 
 		goto cleanup;
 	}
@@ -662,8 +631,7 @@ static void grecka_main(void)
 	if (setsockopt(fd_send, IPPROTO_IP, IP_HDRINCL, &opt, sizeof(opt)) < 0) {
 		const int err = errno;
 
-		NDM_LOG_ERROR("%s: unable to set IP_HDRINCL on send socket: %s",
-			interface_id,
+		NDM_LOG_ERROR("unable to set IP_HDRINCL on send socket: %s",
 			strerror(err));
 
 		goto cleanup;
@@ -691,8 +659,7 @@ static void grecka_main(void)
 		if (fd_request == -1) {
 			const int err = errno;
 
-			NDM_LOG_ERROR("%s: unable to open keepalive request handling socket: %s",
-				interface_id,
+			NDM_LOG_ERROR("unable to open keepalive request handling socket: %s",
 				strerror(err));
 
 			goto cleanup;
@@ -720,8 +687,7 @@ static void grecka_main(void)
 		if (fd_reply == -1) {
 			const int err = errno;
 
-			NDM_LOG_ERROR("%s: unable to open keepalive reply handling socket: %s",
-				interface_id,
+			NDM_LOG_ERROR("unable to open keepalive reply handling socket: %s",
 				strerror(err));
 
 			goto cleanup;
@@ -772,7 +738,7 @@ int main(int argc, char *argv[])
 	const char *const ident = ndm_log_get_ident(argv);
 	int c;
 
-	if (!ndm_log_init(ident, NULL, false, false)) {
+	if (!ndm_log_init(ident, NULL, false, true)) {
 		fprintf(stderr, "%s: failed to initialize a log\n", ident);
 
 		return ret_code;
@@ -848,31 +814,37 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	if (!ndm_log_init(ident, interface_id, false, true)) {
+		fprintf(stderr, "%s: failed to reinitialize log\n", ident);
+
+		return ret_code;
+	}
+
 	if (!ndm_sys_init()) {
-		NDM_LOG_ERROR("%s: unable to init libndm", interface_id);
+		NDM_LOG_ERROR("unable to init libndm");
 
 		return ret_code;
 	}
 
 	if (!ndm_sys_set_default_signals()) {
-		NDM_LOG_ERROR("%s: unable set signal handlers", interface_id);
+		NDM_LOG_ERROR("unable set signal handlers");
 
 		return ret_code;
 	}
 
-	NDM_LOG_INFO("%s: GRE keepalive daemon started", interface_id);
+	NDM_LOG_INFO("GRE keepalive daemon started");
 
 	if (send_probes) {
-		NDM_LOG_INFO("%s: send active requests enabled", interface_id);
+		NDM_LOG_INFO("send active requests enabled");
 	}
 
 	if (handle_requests) {
-		NDM_LOG_INFO("%s: replies to external requests enabled", interface_id);
+		NDM_LOG_INFO("replies to external requests enabled");
 	}
 
 	grecka_main();
 
-	NDM_LOG_INFO("%s: GRE keepalive daemon stopped", interface_id);
+	NDM_LOG_INFO("GRE keepalive daemon stopped");
 
-	return ret_code;
+	return EXIT_SUCCESS;
 }
