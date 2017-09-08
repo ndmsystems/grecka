@@ -32,6 +32,8 @@ THE SOFTWARE.
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <pwd.h>
+#include <grp.h>
 
 #include <linux/if.h>
 #include <linux/ip.h>
@@ -77,6 +79,7 @@ struct keepalive_packet
 } NDM_ATTR_PACKED;
 
 /* external configuration */
+static const char *user = "nobody";
 static bool handle_requests = false;
 static bool send_probes = false;
 static bool debug = false;
@@ -237,6 +240,46 @@ static bool grecka_attach_bpf(int fd, struct sock_fprog *bpf)
 		NDM_LOG_ERROR("unable to attach BPF socket filter: %s", strerror(err));
 
 		return false;
+	}
+
+	return true;
+}
+
+static bool grecka_drop_privileges()
+{
+	if (geteuid() == 0) {
+		struct group *grp;
+		struct passwd *pwd;
+
+		errno = 0;
+		pwd = getpwnam(user);
+
+		if (pwd == NULL) {
+			NDM_LOG_ERROR("Unable to get UID for user \"%s\": %s",
+				user, strerror(errno));
+			return false;
+		}
+
+		errno = 0;
+		grp = getgrnam(user);
+
+		if (grp == NULL) {
+			NDM_LOG_ERROR("Unable to get GID for group \"%s\": %s",
+				user, strerror(errno));
+			return false;
+		}
+
+		if (setgid(grp->gr_gid) == -1) {
+			NDM_LOG_ERROR("Unable to set new group \"%s\": %s",
+				user, strerror(errno));
+			return false;
+		}
+
+		if (setuid(pwd->pw_uid) == -1) {
+			NDM_LOG_ERROR("Unable to set new user \"%s\": %s",
+				user, strerror(errno));
+			return false;
+		}
 	}
 
 	return true;
@@ -709,6 +752,9 @@ static void grecka_main(void)
 		}
 	}
 
+	if (!grecka_drop_privileges())
+		goto cleanup;
+
 	ndm_time_get_monotonic(&last_send);
 	ndm_time_get_monotonic(&last_recv);
 
@@ -748,12 +794,16 @@ int main(int argc, char *argv[])
 	remote_address = NDM_IP_SOCKADDR_ANY;
 
 	for (;;) {
-		c = getopt(argc, argv, "i:c:raI:L:R:dF:");
+		c = getopt(argc, argv, "u:i:c:raI:L:R:dF:");
 
 		if (c < 0)
 			break;
 
 		switch (c) {
+
+		case 'u':
+			user = optarg;
+			break;
 
 		case 'd':
 			debug = true;
