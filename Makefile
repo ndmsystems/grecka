@@ -15,7 +15,7 @@ GRECKA    = greckad
 EXEC_DIR  = /sbin/
 UNAME    := $(shell uname)
 
-OBJS=$(patsubst %.c,%.o,$(wildcard *.c))
+OBJS=$(patsubst %.c,%.o,$(sort $(wildcard *.c)))
 CFLAGS   ?= \
 	-g3 -pipe -fPIC -std=c99 \
 	-D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 \
