@@ -554,7 +554,8 @@ static void grecka_send_keepalive()
 		ndm_time_get_monotonic(&ts);
 		ndm_time_sub(&ts, &last_recv);
 
-		NDM_LOG_INFO("(>) last GRE keepalive reply was %ld s ago", ts.tv_sec);
+		NDM_LOG_INFO("(>) last GRE keepalive reply was %lld s ago",
+			(long long)ts.tv_sec);
 	}
 }
 
