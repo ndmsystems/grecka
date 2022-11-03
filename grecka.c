@@ -399,7 +399,7 @@ static void grecka_handle_ka_reply()
 			return;
 		}
 
-		NDM_LOG_ERROR("(>) unable to receive keepalive reply: %d", bytes_read);
+		NDM_LOG_ERROR("(>) unable to receive keepalive reply: %zu", bytes_read);
 
 		return;
 	}
@@ -440,7 +440,7 @@ static void grecka_handle_ka_request()
 			return;
 		}
 
-		NDM_LOG_ERROR("(<) unable to receive keepalive request: %d",
+		NDM_LOG_ERROR("(<) unable to receive keepalive request: %zu",
 			bytes_read);
 
 		return;
@@ -479,7 +479,7 @@ static void grecka_handle_ka_request()
 					&(p.inner_ip_hdr), reply_len,
 					&bytes_written, &remote_address) ||
 				bytes_written != reply_len) {
-			NDM_LOG_ERROR("unable to send reply to GRE keepalive request packet: %u",
+			NDM_LOG_ERROR("unable to send reply to GRE keepalive request packet: %zu",
 				bytes_written);
 		} else
 		if (debug) {
@@ -541,7 +541,7 @@ static void grecka_send_keepalive()
 	if (!grecka_nonblock_write(fd_send, &p, sizeof(p),
 				&bytes_written, &remote_address) ||
 			bytes_written != sizeof(p)) {
-		NDM_LOG_ERROR("(>) unable to send GRE keepalive packet: %u",
+		NDM_LOG_ERROR("(>) unable to send GRE keepalive packet: %zu",
 			bytes_written);
 	} else
 	if (debug) {
