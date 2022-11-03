@@ -588,14 +588,14 @@ static void grecka_event_loop()
 			struct timespec ts_now;
 
 			ndm_time_get_monotonic(&ts_now);
-			ndm_time_add_sec(&ts, interval);
+			ndm_time_add_sec(&ts, (int64_t)interval);
 
 			if (ndm_time_greater_or_equal(&ts_now, &ts)) {
 				grecka_send_keepalive();
 				last_send = ts_now;
 			}
 
-			ndm_time_add_sec(&ts_rcv, interval * count);
+			ndm_time_add_sec(&ts_rcv, (int64_t)(interval * count));
 
 			if (ndm_time_greater_or_equal(&ts_now, &ts_rcv)) {
 				const char *args[] = {
